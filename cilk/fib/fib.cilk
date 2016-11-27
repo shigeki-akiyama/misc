@@ -1,0 +1,47 @@
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/time.h>
+
+static inline double now(void)
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (double)tv.tv_sec + (double)tv.tv_usec*1e-6;
+}
+
+cilk long fib(long n) {
+    if (n < 2) {
+        return n;
+    } else {
+        long r0, r1;
+        r0 = spawn fib(n - 1);
+        r1 = spawn fib(n - 2);
+        sync;
+        return r0 + r1;
+    }
+}
+
+cilk int main(int argc, char **argv) {
+    long n, result;
+    double t0, t1;
+
+    if (argc != 2) {
+        fprintf(stderr, "Usage: %s N\n", argv[0]);
+        exit(1);
+    }
+    n = atol(argv[1]);
+
+    t0 = now();
+
+    result = spawn fib(n);
+    sync;
+
+    t1 = now();
+
+    printf("fib(%ld) = %ld\n", n, result);
+    printf("time = %.6f\n", t1 - t0);
+
+    return 0;
+}
+

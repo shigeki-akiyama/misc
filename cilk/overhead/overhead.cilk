@@ -1,0 +1,71 @@
+#include <stddef.h>
+#include <stdio.h>
+#include <limits.h>
+#include <inttypes.h>
+#include <assert.h>
+
+static inline long rdtsc(void)
+{
+#if (defined __i386__) || (defined __x86_64__)
+    uint32_t hi,lo;
+    asm volatile("lfence\nrdtsc" : "=a"(lo),"=d"(hi));
+    return (long)((uint64_t)hi)<<32 | lo;
+#elif (defined __sparc__) && (defined __arch64__)
+    uint64_t tick;
+    asm volatile("rd %%tick, %0" : "=r" (tick));
+    return (long)tick;
+#else
+#warning "rdtsc() is not implemented."
+        return 0;
+#endif
+}
+
+cilk void *do_nothing(void *p)
+{
+    return p;
+}
+
+void *do_nothing_noinline(void *p);
+
+cilk int measure()
+{
+    int i;
+    long t0, t1, t2, t3;
+    void *x;
+    size_t times = 1000 * 1000;
+
+    // warmup
+    for (i = 0 ; i < times; i++) {
+        x = spawn do_nothing(NULL);
+        sync;
+    }
+
+    t0 = rdtsc();
+    for (i = 0 ; i < times; i++) {
+        x = spawn do_nothing(NULL);
+        sync;
+    }
+    t1 = rdtsc();
+
+    printf("tasking overhead = %ld\n", (t1 - t0) / times);
+
+
+    t2 = rdtsc();
+    for (i = 0; i < times; i++) {
+        do_nothing_noinline(0);
+    }
+    t3 = rdtsc();
+
+    printf("function call overhead = %ld\n", (t3 - t2) / times);
+
+    return 0;
+}
+
+cilk int main(int argc, char **argv)
+{
+    int x;
+    x = spawn measure();
+    sync;
+    return 0;
+}
+
